@@ -131,7 +131,7 @@
       <div class="menu-list">
         <div class="menu-card" id="mCardVideo">
           <span class="menu-card-title">1. 🎥 പഠന വീഡിയോ</span>
-          <button class="btn-green menu-card-btn" onclick="startModule('video')">തുടങ്ങുക</button>
+          <button class="btn-green menu-card-btn" id="mBtnVideo" onclick="startModule('video')">തുടങ്ങുക</button>
         </div>
         <div class="menu-card" id="mCardRevision" style="opacity:0.6;">
           <span class="menu-card-title">2. 📖 റീഡിങ് ടൈം റിവിഷൻ</span>
@@ -488,25 +488,48 @@
     updateHeaderScore();
   }
 
+  function getModuleHasData() {
+    let info = bookData.globalInfo || {};
+    let pages = (bookData.pages || []).filter(p => !p.hidden);
+    let qs = (quizData.questions || []).filter(q => !q.hidden && !q.isHidden);
+    return {
+      video: !!extractVideoId(info.youtubeLink || info.globalYoutubeLink || ""),
+      revision: pages.length > 0,
+      word: wordData.length > 0,
+      reading: readingLessons.length > 0,
+      points: pointsData.length > 0,
+      qprac: qs.length > 0,
+      qchal: qs.length > 0
+    };
+  }
+
   function updateDashboardMenuLocks() {
-    let p = userStats.progress;
+    let has = getModuleHasData();
+    let order = [
+      ['video', 'mCardVideo', 'mBtnVideo'],
+      ['revision', 'mCardRevision', 'mBtnRevision'],
+      ['word', 'mCardWord', 'mBtnWord'],
+      ['reading', 'mCardReading', 'mBtnReading'],
+      ['points', 'mCardPoints', 'mBtnPoints'],
+      ['qprac', 'mCardQPrac', 'mBtnQPrac'],
+      ['qchal', 'mCardQChal', 'mBtnQChal']
+    ];
+    let prevDone = true;
 
-    setMenuCardStatus('mCardRevision', 'mBtnRevision', p.video, () => startModule('revision'));
-    setMenuCardStatus('mCardWord', 'mBtnWord', p.revision, () => startModule('word'));
-
-    let hasReading = readingLessons.length > 0;
-    setMenuCardStatus('mCardReading', 'mBtnReading', p.word, () => {
-      if(!hasReading) { finishModule('reading'); } else { startModule('reading'); }
+    order.forEach(([key, cardId, btnId]) => {
+      if(!has[key]) {
+        // ഡാറ്റ ഇല്ലെങ്കിൽ ഈ ഘട്ടം ഒഴിവാക്കി അടുത്തതിലേക്ക് പോകാം
+        let card = document.getElementById(cardId);
+        let btn = document.getElementById(btnId);
+        if(card) card.style.opacity = '0.6';
+        if(btn) { btn.disabled = true; btn.className = "btn-lock menu-card-btn"; btn.innerText = "ഡാറ്റ ഇല്ല ⏭️"; }
+        return;
+      }
+      setMenuCardStatus(cardId, btnId, prevDone, () => startModule(key));
+      prevDone = !!userStats.progress[key];
     });
 
-    let hasPoints = pointsData.length > 0;
-    setMenuCardStatus('mCardPoints', 'mBtnPoints', hasReading ? p.reading : p.word, () => {
-      if(!hasPoints) { finishModule('points'); } else { startModule('points'); }
-    });
-
-    setMenuCardStatus('mCardQPrac', 'mBtnQPrac', hasPoints ? p.points : (hasReading ? p.reading : p.word), () => startModule('qprac'));
-    setMenuCardStatus('mCardQChal', 'mBtnQChal', p.qprac, () => startModule('qchal'));
-    setMenuCardStatus('mCardCert', 'mBtnCert', p.qchal, () => startModule('cert'));
+    setMenuCardStatus('mCardCert', 'mBtnCert', prevDone, () => startModule('cert'));
   }
 
   function setMenuCardStatus(cardId, btnId, isUnlocked, onClickFn) {
@@ -566,10 +589,8 @@
 
   function extractVideoId(url) {
     if(!url) return "";
-    if (url.includes('youtu.be/')) return url.split('youtu.be/')[1].split('?')[0];
-    if (url.includes('watch?v=')) return url.split('watch?v=').pop().split('&')[0];
-    if (url.includes('embed/')) return url.split('embed/')[1].split('?')[0];
-    return "";
+    let m = String(url).match(/(?:[?&]v=|youtu\.be\/|embed\/|shorts\/|live\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : "";
   }
 
   function initYoutubeIframe(videoId) {
