@@ -630,14 +630,37 @@ function editPageFromList(index) {
     document.getElementById('bookImg').src = page.image || '';
     
     currentZones = JSON.parse(JSON.stringify(page.zones));
-    currentAudioBlobs = []; 
+    currentAudioBlobs = page.audioBlobs ? [...page.audioBlobs] : []; 
     clearReadingDrawBoard();
+    readingPaths = page.readingPaths ? JSON.parse(JSON.stringify(page.readingPaths)) : [];
+    redrawReadingPaths(readingPaths);
+    document.getElementById('readingDrawStatus').innerText = readingPaths.length ? `✏️ വരകൾ: ${readingPaths.length}` : "";
+    savedQuizPathsForZone = null; document.getElementById('quizStatusText').innerText = "";
     
     document.getElementById('zoneCount').innerText = `(${currentZones.length} വാക്കുകൾ ലഭ്യമാണ്)`;
     document.getElementById('btnSavePageFinal').innerText = "💾 ഈ പേജിലെ മാറ്റങ്ങൾ സ്ഥിരപ്പെടുത്തുക";
     
     renderZoneEditList();
     document.getElementById('section-book').scrollIntoView({ behavior: 'smooth' });
+}
+
+function redrawReadingPaths(paths) {
+    let board = document.getElementById('pageDrawBoard');
+    board.innerHTML = "";
+    (paths || []).forEach(path => {
+        if(!path || path.length === 0) return;
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        for(let i = 0; i < 12; i++) {
+            let p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            p.setAttribute("transform", `translate(${(i-6)*0.3}, ${-(i-6)})`);
+            p.setAttribute("stroke", "#2980b9"); p.setAttribute("stroke-width", "2");
+            p.setAttribute("fill", "none"); p.setAttribute("stroke-linecap", "round");
+            let d = `M ${path[0].x} ${path[0].y}`;
+            for(let k = 1; k < path.length; k++) d += ` L ${path[k].x} ${path[k].y}`;
+            p.setAttribute("d", d); g.appendChild(p);
+        }
+        board.appendChild(g);
+    });
 }
 
 function renderZoneEditList() {
@@ -651,15 +674,77 @@ function renderZoneEditList() {
     currentZones.forEach((zone, zIdx) => {
         let d = document.createElement('div');
         d.className = 'manage-item';
-        d.style.padding = '4px';
-        d.style.background = '#fff';
-        d.innerHTML = `
-            <input type="text" class="arabic-input" value="${zone.text || ''}" id="edit_z_text_${zIdx}" onchange="updateZoneTextInMemory(${zIdx})" style="width:50%; margin:0; padding:4px;">
-            <div style="font-size:11px; color:#27ae60;">${zone.audioSrc ? '🔊 പഴയ ശബ്ദമുണ്ട്' : '🎙️ പുതിയ ശബ്ദം'}</div>
-            <button class="btn-danger" style="padding:2px 6px;" onclick="deleteZoneFromCurrentPage(${zIdx})">🗑️</button>
-        `;
+        d.style.cssText = 'padding:6px; background:#fff; flex-wrap:wrap; gap:4px;';
+
+        let inp = document.createElement('input');
+        inp.type = 'text'; inp.className = 'arabic-input'; inp.id = `edit_z_text_${zIdx}`;
+        inp.value = zone.text || '';
+        inp.style.cssText = 'width:100%; margin:0; padding:4px;';
+        inp.onchange = () => updateZoneTextInMemory(zIdx);
+        d.appendChild(inp);
+
+        let audioSrc = "";
+        if(zone.localAudioIndex !== undefined && currentAudioBlobs[zone.localAudioIndex]) {
+            audioSrc = URL.createObjectURL(currentAudioBlobs[zone.localAudioIndex]);
+        } else if(zone.audioSrc) {
+            audioSrc = zone.audioSrc;
+        }
+        let st = document.createElement('div');
+        st.style.cssText = 'font-size:11px; color:#27ae60; width:100%;';
+        let hwCount = zone.writingPaths ? zone.writingPaths.length : 0;
+        st.innerText = (audioSrc ? '🔊 ശബ്ദമുണ്ട്' : '🎙️ ശബ്ദമില്ല') + '  |  ' + (hwCount ? `✍️ ഹാൻഡ്‌റൈറ്റിംഗ് (${hwCount} വര)` : '✍️ ഹാൻഡ്‌റൈറ്റിംഗ് ഇല്ല');
+        d.appendChild(st);
+
+        if(audioSrc) {
+            let au = document.createElement('audio');
+            au.controls = true; au.preload = 'none'; au.src = audioSrc;
+            au.style.cssText = 'width:100%; height:30px;';
+            d.appendChild(au);
+        }
+
+        let recBtn = document.createElement('button');
+        recBtn.type = 'button'; recBtn.id = `zone_rec_btn_${zIdx}`; recBtn.className = 'btn-record';
+        recBtn.style.cssText = 'padding:4px 8px; font-size:11px; width:auto; margin:0;';
+        recBtn.innerText = audioSrc ? '🎤 ശബ്ദം മാറ്റി റെക്കോർഡ് ചെയ്യുക' : '🎤 ശബ്ദം റെക്കോർഡ് ചെയ്യുക';
+        recBtn.onclick = () => toggleZoneRecording(zIdx);
+        d.appendChild(recBtn);
+
+        let hwBtn = document.createElement('button');
+        hwBtn.type = 'button'; hwBtn.className = 'btn-purple';
+        hwBtn.style.cssText = 'padding:4px 8px; font-size:11px; width:auto; margin:0;';
+        hwBtn.innerText = hwCount ? '✍️ ഹാൻഡ്‌റൈറ്റിംഗ് തിരുത്തുക' : '✍️ ഹാൻഡ്‌റൈറ്റിംഗ് ചേർക്കുക';
+        hwBtn.onclick = () => openQuizModal('zone:' + zIdx);
+        d.appendChild(hwBtn);
+
+        let delBtn = document.createElement('button');
+        delBtn.type = 'button'; delBtn.className = 'btn-danger';
+        delBtn.style.cssText = 'padding:4px 8px; font-size:11px; width:auto; margin:0;';
+        delBtn.innerText = '🗑️';
+        delBtn.onclick = () => deleteZoneFromCurrentPage(zIdx);
+        d.appendChild(delBtn);
+
         container.appendChild(d);
     });
+}
+
+let zoneRecorder = null;
+function toggleZoneRecording(zIdx) {
+    if(zoneRecorder && zoneRecorder.state === "recording") { zoneRecorder.stop(); return; }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        let chunks = [];
+        zoneRecorder = new MediaRecorder(stream);
+        zoneRecorder.addEventListener("dataavailable", e => chunks.push(e.data));
+        zoneRecorder.addEventListener("stop", () => {
+            stream.getTracks().forEach(t => t.stop());
+            const blob = new Blob(chunks, { type: 'audio/mp3' });
+            currentAudioBlobs.push(blob);
+            if(currentZones[zIdx]) currentZones[zIdx].localAudioIndex = currentAudioBlobs.length - 1;
+            renderZoneEditList();
+        });
+        zoneRecorder.start();
+        let b = document.getElementById(`zone_rec_btn_${zIdx}`);
+        if(b) b.innerText = '🛑 റെക്കോർഡിംഗ് നിർത്തുക';
+    }).catch(() => alert("മൈക്ക് പെർമിഷൻ നൽകുക!"));
 }
 
 function updateZoneTextInMemory(zIdx) {
@@ -687,6 +772,12 @@ function openQuizModal(target) {
             quizPaths = JSON.parse(JSON.stringify(savedQuizPathsForZone)); 
             redrawQuizPaths(); 
         } 
+    } else if (String(target).startsWith('zone:')) {
+        let zz = currentZones[parseInt(String(target).split(':')[1])];
+        if (zz && zz.writingPaths) {
+            quizPaths = JSON.parse(JSON.stringify(zz.writingPaths));
+            redrawQuizPaths();
+        }
     } else {
         if (liveHandwritingMemory[target]) {
             quizPaths = JSON.parse(JSON.stringify(liveHandwritingMemory[target]));
@@ -738,7 +829,7 @@ function initReadingDrawingEngine() {
     let board = document.getElementById('pageDrawBoard');
     function getCoords(e) { const rect = board.getBoundingClientRect(); let clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0; let clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0; return { x: Math.round(((clientX - rect.left) / rect.width) * 1000), y: Math.round(((clientY - rect.top) / rect.height) * 1000) }; } 
     function start(e) { isReadingDrawing = true; const c = getCoords(e); const g = document.createElementNS("http://www.w3.org/2000/svg", "g"); for(let i=0; i<12; i++) { let p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("transform", `translate(${(i-6)*0.3}, ${-(i-6)})`); p.setAttribute("stroke", "#2980b9"); p.setAttribute("stroke-width", "2"); p.setAttribute("fill", "none"); p.setAttribute("stroke-linecap", "round"); p.setAttribute("d", `M ${c.x} ${c.y}`); g.appendChild(p); } board.appendChild(g); readingPaths.push([{x: c.x, y: c.y}]); } 
-    function move(e) { if(!isReadingDrawing) return; const c = getCoords(e); const g = board.lastElementChild; if(!g) return; g.querySelectorAll("path").forEach(p => p.setAttribute("d", p.setAttribute("d") + ` L ${c.x} ${c.y}`)); readingPaths[readingPaths.length - 1].push({x: c.x, y: c.y}); } 
+    function move(e) { if(!isReadingDrawing) return; const c = getCoords(e); const g = board.lastElementChild; if(!g) return; g.querySelectorAll("path").forEach(p => p.setAttribute("d", p.getAttribute("d") + ` L ${c.x} ${c.y}`)); readingPaths[readingPaths.length - 1].push({x: c.x, y: c.y}); } 
     function end() { if(isReadingDrawing) { isReadingDrawing = false; document.getElementById('readingDrawStatus').innerText = `✏️ വരകൾ ചേർത്തു (${readingPaths.length})`; } } 
     board.addEventListener("mousedown", start); board.addEventListener("mousemove", move); window.addEventListener("mouseup", end); 
     board.addEventListener("touchstart", start, {passive:false}); board.addEventListener("touchmove", move, {passive:false}); window.addEventListener("touchend", end); 
@@ -819,6 +910,12 @@ function saveQuizDrawing() {
     if (currentHandwritingTarget === 'book') {
         savedQuizPathsForZone = JSON.parse(JSON.stringify(quizPaths)); 
         document.getElementById('quizStatusText').innerText = `📝 ഹാൻഡ്‌റൈറ്റിംഗ് റെക്കോർഡ് ചെയ്തു (${savedQuizPathsForZone.length} Lines)`; 
+    } else if (String(currentHandwritingTarget).startsWith('zone:')) {
+        let zi = parseInt(String(currentHandwritingTarget).split(':')[1]);
+        if (currentZones[zi]) currentZones[zi].writingPaths = JSON.parse(JSON.stringify(quizPaths));
+        closeQuizModal();
+        renderZoneEditList();
+        return;
     } else {
         let rowId = currentHandwritingTarget;
         liveHandwritingMemory[rowId] = JSON.parse(JSON.stringify(quizPaths));
@@ -920,10 +1017,8 @@ function addNextPageToMemory() {
     if(editingPageIndex !== null) {
         allPagesMemory[editingPageIndex].lesson = lesson;
         allPagesMemory[editingPageIndex].zones = currentZones;
-        if(currentAudioBlobs.length > 0) {
-            if(!allPagesMemory[editingPageIndex].audioBlobs) allPagesMemory[editingPageIndex].audioBlobs = [];
-            allPagesMemory[editingPageIndex].audioBlobs = allPagesMemory[editingPageIndex].audioBlobs.concat(currentAudioBlobs);
-        }
+        allPagesMemory[editingPageIndex].audioBlobs = currentAudioBlobs;
+        allPagesMemory[editingPageIndex].readingPaths = readingPaths.length > 0 ? JSON.parse(JSON.stringify(readingPaths)) : null;
         alert(`പേജ് ${editingPageIndex + 1} വിജയകരമായി തിരുത്തി!`);
         editingPageIndex = null;
     } else {
