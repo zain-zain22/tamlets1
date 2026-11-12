@@ -504,7 +504,7 @@
     let pages = (bookData.pages || []).filter(p => !p.hidden);
     let qs = (quizData.questions || []).filter(q => !q.hidden && !q.isHidden);
     return {
-      video: !!extractVideoId(info.youtubeLink || info.globalYoutubeLink || ""),
+      video: !!extractVideoId(getVideoLink()),
       revision: pages.length > 0,
       bookword: getBookWordList().length > 0,
       word: wordData.length > 0,
@@ -625,13 +625,24 @@
     else if(modType === 'cert') { setupMasterCertModule(); showView('viewMasterCert'); }
   }
 
+  // പാഠം തിരിച്ചുള്ള ലിങ്കുകളിൽ ഏറ്റവും വലിയ പാഠം നമ്പറിൻ്റേത്; ഇല്ലെങ്കിൽ പൊതു ലിങ്ക്
+  function getVideoLink() {
+    let info = bookData.globalInfo || {};
+    let best = null;
+    (info.lessonVideos || []).forEach(v => {
+      if(v && extractVideoId(v.link) && (!best || (v.lesson || 0) > (best.lesson || 0))) best = v;
+    });
+    if(best) return best.link;
+    return info.youtubeLink || info.globalYoutubeLink || "";
+  }
+
   function setupVideoModule() {
     let info = bookData.globalInfo || {};
     let lName = info.lessonName || info.globalLessonName || 'പഠന വീഡിയോ';
     document.getElementById('vidTitle').innerText = `പാഠം: ${lName}`;
     document.getElementById('vidSubTitle').innerText = `വിഷയം: ${info.subject || 'N/A'} | ക്ലാസ്: ${info.class || 'N/A'}`;
 
-    let ytLink = info.youtubeLink || info.globalYoutubeLink || "";
+    let ytLink = getVideoLink();
     let vidId = extractVideoId(ytLink);
 
     if(vidId) { initYoutubeIframe(vidId); }
