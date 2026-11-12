@@ -137,29 +137,37 @@
           <span class="menu-card-title">2. 📖 റീഡിങ് ടൈം റിവിഷൻ</span>
           <button class="btn-lock menu-card-btn" id="mBtnRevision" disabled>🔒</button>
         </div>
+        <div class="menu-card" id="mCardBookWord" style="opacity:0.6;">
+          <span class="menu-card-title">3. 🔤 പാഠപുസ്തക വാക്ക് ചലഞ്ച്</span>
+          <button class="btn-lock menu-card-btn" id="mBtnBookWord" disabled>🔒</button>
+        </div>
         <div class="menu-card" id="mCardWord" style="opacity:0.6;">
-          <span class="menu-card-title">3. 🧠 സൂപ്പർ വേർഡ് ചലഞ്ച്</span>
+          <span class="menu-card-title">4. 🧠 സൂപ്പർ വേർഡ് ചലഞ്ച്</span>
           <button class="btn-lock menu-card-btn" id="mBtnWord" disabled>🔒</button>
         </div>
         <div class="menu-card" id="mCardReading" style="opacity:0.6;">
-          <span class="menu-card-title">4. 🎤 വായനാ വേദി</span>
+          <span class="menu-card-title">5. 🎤 വായനാ വേദി</span>
           <button class="btn-lock menu-card-btn" id="mBtnReading" disabled>🔒</button>
         </div>
         <div class="menu-card" id="mCardPoints" style="opacity:0.6;">
-          <span class="menu-card-title">5. 📌 പ്രധാന പോയിന്റുകൾ</span>
+          <span class="menu-card-title">6. 📌 പ്രധാന പോയിന്റുകൾ</span>
           <button class="btn-lock menu-card-btn" id="mBtnPoints" disabled>🔒</button>
         </div>
         <div class="menu-card" id="mCardQPrac" style="opacity:0.6;">
-          <span class="menu-card-title">6. 📝 ക്വിസ്സ് പ്രാക്ടീസ്</span>
+          <span class="menu-card-title">7. 📝 ക്വിസ്സ് പ്രാക്ടീസ്</span>
           <button class="btn-lock menu-card-btn" id="mBtnQPrac" disabled>🔒</button>
         </div>
         <div class="menu-card" id="mCardQChal" style="opacity:0.6;">
-          <span class="menu-card-title">7. 🏆 ഫൈനൽ ക്വിസ്സ് ചലഞ്ച്</span>
+          <span class="menu-card-title">8. 🏆 ഫൈനൽ ക്വിസ്സ് ചലഞ്ച്</span>
           <button class="btn-lock menu-card-btn" id="mBtnQChal" disabled>🔒</button>
         </div>
         <div class="menu-card" id="mCardCert" style="opacity:0.6; background:#fef9e7;">
-          <span class="menu-card-title">8. 📜 മാസ്റ്റർ സർട്ടിഫിക്കറ്റ്</span>
+          <span class="menu-card-title">9. 📜 മാസ്റ്റർ സർട്ടിഫിക്കറ്റ്</span>
           <button class="btn-lock menu-card-btn" id="mBtnCert" disabled>🔒</button>
+        </div>
+        <div class="menu-card" id="mCardWorksheet" style="opacity:0.6; background:#eaf4fc;">
+          <span class="menu-card-title">10. 📄 വർക്ക്ഷീറ്റ്</span>
+          <button class="btn-lock menu-card-btn" id="mBtnWorksheet" disabled>🔒</button>
         </div>
       </div>
 
@@ -348,6 +356,7 @@
 
 <script>
   let masterList = {};
+  let workPdfUrl = "";
   let bookData = {};
   let quizData = {};
   let readingLessons = [];
@@ -363,7 +372,7 @@
   let userStats = {
     penaltyPoints: 0,
     readingAccuracy: 100,
-    progress: { video: false, revision: false, word: false, reading: false, points: false, qprac: false, qchal: false }
+    progress: { video: false, revision: false, bookword: false, word: false, reading: false, points: false, qprac: false, qchal: false }
   };
 
   let isVideoPlaying = false;
@@ -400,14 +409,16 @@
   async function fetchBackendData() {
     let t = Date.now();
     try {
-      let [r1, r2, r3, r4, r5, r6] = await Promise.all([
+      let [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
         fetch(`data/master_list.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({})),
         fetch(`data/data_book.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({})),
         fetch(`data/quiz_data.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({})),
         fetch(`data/data_reading.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({})),
         fetch(`data/data_points.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({})),
-        fetch(`data/data.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({}))
+        fetch(`data/data.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({})),
+        fetch(`data/work_pdf.json?t=${t}`).then(res => res.ok ? res.json() : {}).catch(() => ({}))
       ]);
+      workPdfUrl = (r7 && r7.pdf) ? r7.pdf : "";
 
       masterList = r1;
       bookData = r2;
@@ -495,6 +506,7 @@
     return {
       video: !!extractVideoId(info.youtubeLink || info.globalYoutubeLink || ""),
       revision: pages.length > 0,
+      bookword: getBookWordList().length > 0,
       word: wordData.length > 0,
       reading: readingLessons.length > 0,
       points: pointsData.length > 0,
@@ -508,28 +520,66 @@
     let order = [
       ['video', 'mCardVideo', 'mBtnVideo'],
       ['revision', 'mCardRevision', 'mBtnRevision'],
+      ['bookword', 'mCardBookWord', 'mBtnBookWord'],
       ['word', 'mCardWord', 'mBtnWord'],
       ['reading', 'mCardReading', 'mBtnReading'],
       ['points', 'mCardPoints', 'mBtnPoints'],
       ['qprac', 'mCardQPrac', 'mBtnQPrac'],
       ['qchal', 'mCardQChal', 'mBtnQChal']
     ];
-    let prevDone = true;
+    let allDone = true;
 
     order.forEach(([key, cardId, btnId]) => {
+      let card = document.getElementById(cardId);
+      let btn = document.getElementById(btnId);
       if(!has[key]) {
-        // ഡാറ്റ ഇല്ലെങ്കിൽ ഈ ഘട്ടം ഒഴിവാക്കി അടുത്തതിലേക്ക് പോകാം
-        let card = document.getElementById(cardId);
-        let btn = document.getElementById(btnId);
+        // ഡാറ്റ ഇല്ലാത്ത ഘട്ടം ഒഴിവാക്കപ്പെടും (സർട്ടിഫിക്കറ്റിന് ആവശ്യമില്ല)
         if(card) card.style.opacity = '0.6';
         if(btn) { btn.disabled = true; btn.className = "btn-lock menu-card-btn"; btn.innerText = "ഡാറ്റ ഇല്ല ⏭️"; }
         return;
       }
-      setMenuCardStatus(cardId, btnId, prevDone, () => startModule(key));
-      prevDone = !!userStats.progress[key];
+      // എല്ലാ ഘട്ടവും ഏത് ക്രമത്തിലും തുറക്കാം
+      setMenuCardStatus(cardId, btnId, true, () => startModule(key));
+      if(userStats.progress[key]) {
+        if(btn) btn.innerText = "✅ പൂർത്തിയായി (വീണ്ടും ചെയ്യാം)";
+      } else {
+        allDone = false;
+      }
     });
 
-    setMenuCardStatus('mCardCert', 'mBtnCert', prevDone, () => startModule('cert'));
+    setActionCard('mCardCert', 'mBtnCert', allDone, "📥 സർട്ടിഫിക്കറ്റ് ഡൗൺലോഡ്", "🔒 എല്ലാം പൂർത്തിയാക്കുക",
+      () => { setupMasterCertModule(); downloadMasterCertificate(); });
+
+    if(!workPdfUrl) {
+      setActionCard('mCardWorksheet', 'mBtnWorksheet', false, "", "വർക്ക്ഷീറ്റ് ലഭ്യമല്ല", null);
+    } else {
+      setActionCard('mCardWorksheet', 'mBtnWorksheet', allDone, "📥 വർക്ക്ഷീറ്റ് ഡൗൺലോഡ്", "🔒 എല്ലാം പൂർത്തിയാക്കുക", downloadWorkSheet);
+    }
+  }
+
+  function setActionCard(cardId, btnId, isUnlocked, unlockedLabel, lockedLabel, onClickFn) {
+    let card = document.getElementById(cardId);
+    let btn = document.getElementById(btnId);
+    if(!card || !btn) return;
+    if(isUnlocked) {
+      card.style.opacity = '1';
+      btn.disabled = false;
+      btn.className = "btn-green menu-card-btn";
+      btn.innerText = unlockedLabel;
+      btn.onclick = onClickFn;
+    } else {
+      card.style.opacity = '0.6';
+      btn.disabled = true;
+      btn.className = "btn-lock menu-card-btn";
+      btn.innerText = lockedLabel;
+    }
+  }
+
+  function downloadWorkSheet() {
+    if(!workPdfUrl) return alert("വർക്ക്ഷീറ്റ് ലഭ്യമല്ല!");
+    let a = document.createElement('a');
+    a.href = workPdfUrl; a.download = "worksheet.pdf"; a.target = "_blank";
+    document.body.appendChild(a); a.click(); a.remove();
   }
 
   function setMenuCardStatus(cardId, btnId, isUnlocked, onClickFn) {
@@ -566,6 +616,7 @@
   function startModule(modType) {
     if(modType === 'video') { setupVideoModule(); showView('viewVideo'); }
     else if(modType === 'revision') { setupRevisionModule(); showView('viewRevision'); }
+    else if(modType === 'bookword') { setupBookWordModule(); showView('viewWord'); }
     else if(modType === 'word') { setupWordModule(); showView('viewWord'); }
     else if(modType === 'reading') { setupReadingModule(); showView('viewReading'); }
     else if(modType === 'points') { setupPointsModule(); showView('viewPoints'); }
@@ -661,6 +712,43 @@
     if(ytPlayer) ytPlayer.playVideo();
   }
 
+  // പുതിയ പാഠം ആദ്യം (പാഠം നമ്പർ കൂടിയത് മുന്നിൽ); ഒരു പാഠത്തിനുള്ളിൽ പേജുകൾ ആദ്യം മുതൽ അവസാനം വരെ ക്രമത്തിൽ
+  function getPagesNewestLessonFirst() {
+    return (bookData.pages || []).filter(p => !p.hidden)
+      .map((p, i) => ({ p: p, i: i }))
+      .sort((x, y) => ((y.p.lesson || 1) - (x.p.lesson || 1)) || (x.i - y.i))
+      .map(o => o.p);
+  }
+
+  // പാഠപുസ്തക വാക്കുകൾ: ടെക്സ്റ്റും ശബ്ദവും ഉള്ളതും കുറഞ്ഞത് 2 അക്ഷരമുള്ളതും മാത്രം
+  function getBookWordList() {
+    let list = [];
+    getPagesNewestLessonFirst().forEach(page => {
+      (page.zones || []).forEach(z => {
+        let t = (z.text || "").trim();
+        if(t && z.audioSrc && splitArabicWord(t).length >= 2) {
+          list.push({ mal: "", arbiText: t, audio: z.audioSrc, writingPaths: z.writingPaths || null });
+        }
+      });
+    });
+    return list;
+  }
+
+  let wordModeKey = 'word';
+
+  function setupBookWordModule() {
+    let list = getBookWordList();
+    if(list.length === 0) {
+      alert("പാഠപുസ്തക വാക്കുകൾ ലഭ്യമല്ല! അടുത്ത ഘട്ടത്തിലേക്ക് സ്കിപ്പ് ചെയ്യുന്നു.");
+      finishModule('bookword');
+      return;
+    }
+    wordModeKey = 'bookword';
+    wordActiveList = list;
+    currentWordIdx = 0;
+    loadWordChallengeLevel();
+  }
+
   function setupRevisionModule() {
     let pages = (bookData.pages || []).filter(p => !p.hidden);
     if(pages.length === 0) {
@@ -668,7 +756,7 @@
       finishModule('revision');
       return;
     }
-    revisionPagesList = pages.reverse();
+    revisionPagesList = getPagesNewestLessonFirst();
     currentRevIdx = 0;
     loadRevisionPage();
   }
@@ -689,6 +777,7 @@
     btn.innerText = disabled ? "⏳ ഓഡിയോ പ്ലേ ചെയ്യുന്നു..." : "അടുത്ത വാക്ക് ➡️";
   }
 
+  let revLineTimers = [];
   function stepToNextWord() {
     if(!isWordAudioFinished) return;
     document.getElementById('playbackEngine').innerHTML = "";
@@ -717,7 +806,11 @@
       setRevNextBtnStatus(false);
     });
 
-    if(page.readingPaths && page.readingPaths[currentRevZoneIdx]) {
+    revLineTimers.forEach(clearInterval); revLineTimers = [];
+    let pageHasZoneLines = page.zones.some(z => Array.isArray(z.linePaths));
+    if(Array.isArray(zone.linePaths)) {
+      zone.linePaths.forEach(pts => animateReadingPathSvg(pts));
+    } else if(!pageHasZoneLines && page.readingPaths && page.readingPaths[currentRevZoneIdx]) {
       animateReadingPathSvg(page.readingPaths[currentRevZoneIdx]);
     }
   }
@@ -765,6 +858,7 @@
       handImg.setAttribute("x", currPt.x - 33); handImg.setAttribute("y", currPt.y - 50);
       ptIdx++;
     }, speed);
+    revLineTimers.push(interval);
   }
 
   function setupWordModule() {
@@ -773,6 +867,7 @@
       finishModule('word');
       return;
     }
+    wordModeKey = 'word';
     wordActiveList = [...wordData];
     currentWordIdx = 0;
     loadWordChallengeLevel();
@@ -785,7 +880,7 @@
     document.getElementById('wordLivePenalty').innerText = userStats.penaltyPoints;
 
     let obj = wordActiveList[currentWordIdx];
-    document.getElementById('malWordDisplay').innerText = obj.mal;
+    document.getElementById('malWordDisplay').innerText = obj.mal || '🔊 ശബ്ദം കേട്ട് അക്ഷരങ്ങൾ ശരിയായ ക്രമത്തിൽ അമർത്തുക';
     document.getElementById('arabicOutput').innerText = "";
     currentTypedLetters = [];
     targetLettersSequence = splitArabicWord(obj.arbiText || obj.arbi || "");
@@ -948,7 +1043,7 @@
       loadWordChallengeLevel();
     } else {
       alert("🎉 വേർഡ് ചലഞ്ച് പൂർത്തിയായി!");
-      finishModule('word');
+      finishModule(wordModeKey);
     }
   }
 
