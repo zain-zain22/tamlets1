@@ -100,6 +100,11 @@ audio { margin-top: 5px; display: none; width: 100%; }
 
 <label style="margin-top: 10px; display: block;">യൂട്യൂബ് വീഡിയോ ലിങ്ക് (YouTube Link):</label>
 <input type="text" id="globalYoutubeLink" placeholder="https://www.youtube.com/watch?v=xxxxx">
+
+<label style="margin-top: 10px; display: block;">പാഠം തിരിച്ചുള്ള വീഡിയോ ലിങ്കുകൾ (ഓപ്ഷണൽ - LKG, ഒന്നാം ക്ലാസ്സിന്):</label>
+<p style="font-size:11px; color:#555; margin:0 0 4px 0;">ഓരോ വരിയിലും: പാഠം നമ്പർ | ലിങ്ക്. ഏറ്റവും വലിയ പാഠം നമ്പറിൻ്റെ വീഡിയോ ആണ് കുട്ടിക്ക് കാണിക്കുക. ഒന്നും നൽകിയില്ലെങ്കിൽ മുകളിലെ പൊതു ലിങ്ക് ഉപയോഗിക്കും.</p>
+<textarea id="lessonVideosInput" style="min-height:80px; font-size:13px;" placeholder="1 | https://youtu.be/xxxxxxxxxxx
+2 | https://youtu.be/yyyyyyyyyyy"></textarea>
 </div>
 </div> 
 
@@ -342,8 +347,10 @@ audio { margin-top: 5px; display: none; width: 100%; }
 </div> 
 
 <script> 
-const GH_USER = "zain-zain22"; 
-const GH_REPO = "tamlets1"; 
+// റെപ്പോയുടെ പേര് പേജിൻ്റെ വിലാസത്തിൽ നിന്ന് തനിയെ എടുക്കുന്നു (കോപ്പി ചെയ്ത റെപ്പോയിലും ശരിയായി പ്രവർത്തിക്കാൻ)
+const IS_GH_PAGES = location.hostname.endsWith('.github.io') && location.pathname.split('/')[1];
+const GH_USER = IS_GH_PAGES ? location.hostname.split('.')[0] : "zain-zain22";
+const GH_REPO = IS_GH_PAGES ? location.pathname.split('/')[1] : "tamlets1"; 
 const GH_BRANCH = "main"; 
 
 let masterSchoolData = {}; 
@@ -449,6 +456,18 @@ async function saveWorkPDF(){
     document.getElementById("pdfStatus").innerHTML= "✅ PDF വിജയകരമായി അപ്‌ലോഡ് ചെയ്തു";
 }
 
+function parseLessonVideos() {
+    let out = [];
+    document.getElementById('lessonVideosInput').value.split('\n').forEach(line => {
+        let idx = line.indexOf('|');
+        if(idx < 0) return;
+        let lesson = parseInt(line.slice(0, idx).trim());
+        let link = line.slice(idx + 1).trim();
+        if(lesson > 0 && link) out.push({ lesson: lesson, link: link });
+    });
+    return out;
+}
+
 async function loadOldDataFromGitHub() { 
     dataLoadFailed = false; 
     document.getElementById('loadingOverlay').style.display = 'flex'; 
@@ -469,6 +488,7 @@ async function loadOldDataFromGitHub() {
                 document.getElementById('globalChapter').value = oldBook.globalInfo.chapter || '';
                 document.getElementById('globalLessonName').value = oldBook.globalInfo.lessonName || '';
                 document.getElementById('globalYoutubeLink').value = oldBook.globalInfo.youtubeLink || '';
+                document.getElementById('lessonVideosInput').value = (oldBook.globalInfo.lessonVideos || []).map(v => v.lesson + ' | ' + v.link).join('\n');
             }
             if(oldBook && Array.isArray(oldBook.pages)) allPagesMemory = oldBook.pages.map(page => ({ ...page, isNewPage: false })); 
         } 
@@ -1493,7 +1513,8 @@ async function publishToGitHubDirectly() {
         part: document.getElementById('globalPart').value.trim(), 
         chapter: document.getElementById('globalChapter').value.trim(), 
         lessonName: document.getElementById('globalLessonName').value.trim(), 
-        youtubeLink: document.getElementById('globalYoutubeLink').value.trim() 
+        youtubeLink: document.getElementById('globalYoutubeLink').value.trim(),
+          lessonVideos: parseLessonVideos() 
     }; 
 
     try { 
