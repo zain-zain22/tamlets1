@@ -1,12 +1,13 @@
 {
-  "version": 1794221893300,
+  "version": 1794581689448,
   "quizInfo": {
     "class": "",
     "subject": "",
     "part": "",
     "chapter": "",
     "lessonName": "",
-    "youtubeLink": ""
+    "youtubeLink": "",
+    "lessonVideos": []
   },
   "questions": []
 }
